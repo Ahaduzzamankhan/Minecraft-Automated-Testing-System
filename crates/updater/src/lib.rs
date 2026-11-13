@@ -860,10 +860,14 @@ mod tests {
 
     #[test]
     fn selects_the_current_platform_asset() {
+        // Keep fixtures for every release target so this test is portable.
         let assets = vec![
             asset("mats-v1.1.0-windows-x86_64.exe"),
+            asset("mats-v1.1.0-windows-aarch64.exe"),
             asset("mats-v1.1.0-linux-x86_64"),
             asset("mats-v1.1.0-linux-aarch64"),
+            asset("mats-v1.1.0-macos-x86_64"),
+            asset("mats-v1.1.0-macos-aarch64"),
             asset("SHA256SUMS"),
         ];
         let (os, arch) = platform_slug();

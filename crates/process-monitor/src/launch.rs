@@ -448,8 +448,13 @@ mod tests {
         );
         #[cfg(windows)]
         let (program, args) = (
-            PathBuf::from("cmd"),
-            vec!["/C".to_string(), script.to_string()],
+            PathBuf::from("powershell"),
+            vec![
+                "-NoProfile".to_string(),
+                "-NonInteractive".to_string(),
+                "-Command".to_string(),
+                script.to_string(),
+            ],
         );
         LaunchSpec {
             program,
