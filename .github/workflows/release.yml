@@ -154,15 +154,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: repo
       - name: Create and push annotated tag
         env:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "MATS $TAG"
-          git push origin "$TAG"
+          repo_dir="$GITHUB_WORKSPACE/repo"
+          test -d "$repo_dir/.git" || {
+            echo "Repository checkout not found at $repo_dir" >&2
+            exit 1
+          }
+          git -C "$repo_dir" config user.name "github-actions[bot]"
+          git -C "$repo_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$repo_dir" tag -a "$TAG" -m "MATS $TAG"
+          git -C "$repo_dir" push origin "$TAG"
 
   publish:
     name: Upload assets and publish GitHub Release
