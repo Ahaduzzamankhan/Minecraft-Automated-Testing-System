@@ -20,6 +20,32 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  prepare:
+    name: Validate release version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Normalize and validate version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $INPUT_VERSION (expected semantic version, e.g. 1.0.1)" >&2
+            exit 1
+          fi
+          tag="v$version"
+          if git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; choose a new version." >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
   test:
     name: Test on ${{ matrix.os }}
     strategy:
@@ -40,7 +66,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.asset }}
-    needs: [test]
+    needs: [test, prepare]
     strategy:
       fail-fast: false
       matrix:
@@ -100,7 +126,7 @@ jobs:
           set -euo pipefail
           source="target/${{ matrix.target }}/release/mats"
           if [ -f "${source}.exe" ]; then source="${source}.exe"; fi
-          dest="mats-${{ inputs.version }}-${{ matrix.asset }}${{ matrix.ext }}"
+          dest="mats-${{ needs.prepare.outputs.tag }}-${{ matrix.asset }}${{ matrix.ext }}"
           mkdir -p dist
           cp "$source" "dist/$dest"
           if [ "${{ runner.os }}" != "Windows" ]; then chmod +x "dist/$dest"; fi
@@ -117,39 +143,20 @@ jobs:
 
   tag:
     name: Create release tag
-    needs: [build]
+    needs: [build, prepare]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version: ${{ steps.version.outputs.version }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Validate version
-        id: version
-        shell: bash
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          version="${INPUT_VERSION#v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid version: $INPUT_VERSION (expected semantic version, e.g. 1.0.1)" >&2
-            exit 1
-          fi
-          tag="v$version"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists; choose a new version." >&2
-            exit 1
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Create and push annotated tag
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
