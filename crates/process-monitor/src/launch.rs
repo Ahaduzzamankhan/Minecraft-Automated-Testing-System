@@ -467,10 +467,14 @@ mod tests {
     #[test]
     fn captures_output_and_exit_code() {
         let temp = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
+        let script = "echo hello-stdout; echo hello-stderr 1>&2; exit 0";
+        #[cfg(windows)]
+        let script = r#"[Console]::Out.WriteLine('hello-stdout'); [Console]::Error.WriteLine('hello-stderr'); exit 0"#;
         let spec = LaunchSpec {
             log_dir: temp.path().to_path_buf(),
             timeout: Duration::from_secs(20),
-            ..shell_command("echo", "echo hello-stdout; echo hello-stderr 1>&2; exit 0")
+            ..shell_command("echo", script)
         };
         let outcome = launch(&spec).unwrap();
         assert_eq!(outcome.exit_code, Some(0));
