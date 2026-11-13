@@ -1,28 +1,48 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag to release (for example v1.0.0)"
+      version:
+        description: "Release version (for example 1.0.1 or v1.0.1)"
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: mats-release-${{ inputs.version }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
 
 jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build workspace
+        run: cargo build --workspace --locked
+      - name: Run test suite
+        run: cargo test --workspace --locked --no-fail-fast
+      - name: Smoke test CLI
+        run: cargo run --locked -- --version
+
   build:
     name: Build ${{ matrix.asset }}
+    needs: [test]
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -44,13 +64,11 @@ jobs:
             target: aarch64-unknown-linux-gnu
             asset: linux-aarch64
             ext: ""
-            # Cross-compiled: cannot execute the ARM64 binary on the x86 runner
             verify: false
           - os: macos-latest
             target: x86_64-apple-darwin
             asset: macos-x86_64
             ext: ""
-            # Cross-compiled on the ARM runner; Rosetta is not guaranteed
             verify: false
           - os: macos-latest
             target: aarch64-apple-darwin
@@ -60,128 +78,134 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve version
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
-          else
-            tag="${GITHUB_REF_NAME}"
-          fi
-          case "$tag" in
-            v*) ;;
-            *) tag="v$tag" ;;
-          esac
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-
-      - name: Install the ARM64 Linux cross linker
+      - name: Install Linux ARM64 cross linker
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Build
+      - name: Build release binary
         shell: bash
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --locked --target "${{ matrix.target }}"
-
-      - name: Stage the release asset
+      - name: Stage and verify asset
         shell: bash
         run: |
           set -euo pipefail
           source="target/${{ matrix.target }}/release/mats"
           if [ -f "${source}.exe" ]; then source="${source}.exe"; fi
-          dest="dist/mats-${{ steps.version.outputs.tag }}-${{ matrix.asset }}${{ matrix.ext }}"
+          dest="mats-${{ inputs.version }}-${{ matrix.asset }}${{ matrix.ext }}"
           mkdir -p dist
-          cp "$source" "$dest"
-          if [ "${{ runner.os }}" != "Windows" ]; then chmod +x "$dest"; fi
+          cp "$source" "dist/$dest"
+          if [ "${{ runner.os }}" != "Windows" ]; then chmod +x "dist/$dest"; fi
           if [ "${{ matrix.verify }}" = "true" ]; then
-            # Prove the staged binary runs on this platform before publishing.
-            "$dest" --version
+            "dist/$dest" --version
           fi
-          (cd dist && sha256sum "$(basename "$dest")" > "$(basename "$dest").sha256")
-
+          (cd dist && sha256sum "$dest" > "$dest.sha256")
       - uses: actions/upload-artifact@v4
         with:
-          name: mats-${{ matrix.asset }}
+          name: release-${{ matrix.asset }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 7
 
-  publish:
-    name: Publish the GitHub release
-    runs-on: ubuntu-latest
+  tag:
+    name: Create release tag
     needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve version
+        with:
+          fetch-depth: 0
+      - name: Validate version
         id: version
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            tag="${{ inputs.tag }}"
-          else
-            tag="${GITHUB_REF_NAME}"
+          version="${INPUT_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $INPUT_VERSION (expected semantic version, e.g. 1.0.1)" >&2
+            exit 1
           fi
-          case "$tag" in
-            v*) ;;
-            *) tag="v$tag" ;;
-          esac
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; choose a new version." >&2
+            exit 1
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Create and push annotated tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "MATS $TAG"
+          git push origin "$TAG"
 
+  publish:
+    name: Upload assets and publish GitHub Release
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: release-*
           merge-multiple: true
-
-      - name: Create checksum manifest
+      - name: Validate assets and generate checksums
         shell: bash
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -euo pipefail
           cd dist
-          ls -l
-          # Every platform must have produced an asset; a missing one fails here.
-          expected="windows-x86_64.exe windows-aarch64.exe linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64"
-          for platform in $expected; do
-            if ! ls "mats-${{ steps.version.outputs.tag }}-${platform}" >/dev/null 2>&1; then
-              echo "missing release asset for ${platform}" >&2
-              exit 1
-            fi
+          expected=(
+            "mats-$TAG-windows-x86_64.exe"
+            "mats-$TAG-windows-aarch64.exe"
+            "mats-$TAG-linux-x86_64"
+            "mats-$TAG-linux-aarch64"
+            "mats-$TAG-macos-x86_64"
+            "mats-$TAG-macos-aarch64"
+          )
+          for asset in "${expected[@]}"; do
+            test -s "$asset" || { echo "Missing release asset: $asset" >&2; exit 1; }
           done
-          sha256sum mats-* > SHA256SUMS
+          sha256sum "${expected[@]}" > SHA256SUMS
           cat SHA256SUMS
-
-      - name: Create or update the release
+      - name: Create draft release for the tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-        shell: bash
+          TAG: ${{ needs.tag.outputs.tag }}
+          VERSION: ${{ needs.tag.outputs.version }}
         run: |
           set -euo pipefail
           prerelease=()
           case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
-          else
-            gh release create "$TAG" dist/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "MATS $VERSION" \
-              --generate-notes \
-              "${prerelease[@]}"
-          fi
+          gh release create "$TAG" --draft --title "MATS $VERSION" --generate-notes "${prerelease[@]}"
+      - name: Upload platform binaries and checksums to the tag release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: gh release upload "$TAG" dist/* --clobber
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false
