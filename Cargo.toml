@@ -1,0 +1,80 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mats-core",
+    "crates/jar-inspector",
+    "crates/metadata-parser",
+    "crates/version-resolver",
+    "crates/resource-manager",
+    "crates/java-manager",
+    "crates/runtime-builder",
+    "crates/process-monitor",
+    "crates/performance-monitor",
+    "crates/log-analyzer",
+    "crates/crash-detector",
+    "crates/mixin-analyzer",
+    "crates/conflict-detector",
+    "crates/diagnostics",
+    "crates/report-generator",
+    "crates/storage",
+    "crates/updater",
+    "crates/test-runner",
+    "crates/mats-cli",
+]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Ahaduzzamankhan/Minecraft-Automated-Testing-System"
+homepage = "https://github.com/Ahaduzzamankhan/Minecraft-Automated-Testing-System"
+authors = ["MATS contributors"]
+
+[workspace.dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+dirs = "6.0"
+flate2 = "1.0"
+hex = "0.4"
+regex = "1.11"
+semver = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha1 = "0.10"
+sha2 = "0.10"
+tar = "0.4"
+tempfile = "3.14"
+thiserror = "2.0"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ureq = { version = "2.12", features = ["tls", "gzip"] }
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+
+mats-core = { path = "crates/mats-core" }
+jar-inspector = { path = "crates/jar-inspector" }
+metadata-parser = { path = "crates/metadata-parser" }
+version-resolver = { path = "crates/version-resolver" }
+resource-manager = { path = "crates/resource-manager" }
+java-manager = { path = "crates/java-manager" }
+runtime-builder = { path = "crates/runtime-builder" }
+process-monitor = { path = "crates/process-monitor" }
+performance-monitor = { path = "crates/performance-monitor" }
+log-analyzer = { path = "crates/log-analyzer" }
+crash-detector = { path = "crates/crash-detector" }
+mixin-analyzer = { path = "crates/mixin-analyzer" }
+conflict-detector = { path = "crates/conflict-detector" }
+diagnostics = { path = "crates/diagnostics" }
+report-generator = { path = "crates/report-generator" }
+storage = { path = "crates/storage" }
+updater = { path = "crates/updater" }
+test-runner = { path = "crates/test-runner" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

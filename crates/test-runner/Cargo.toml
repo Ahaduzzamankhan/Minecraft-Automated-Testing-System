@@ -1,0 +1,35 @@
+[package]
+name = "test-runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Test orchestration for MATS"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+conflict-detector.workspace = true
+crash-detector.workspace = true
+diagnostics.workspace = true
+jar-inspector.workspace = true
+java-manager.workspace = true
+log-analyzer.workspace = true
+mats-core.workspace = true
+metadata-parser.workspace = true
+mixin-analyzer.workspace = true
+performance-monitor.workspace = true
+process-monitor.workspace = true
+report-generator.workspace = true
+resource-manager.workspace = true
+runtime-builder.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+tracing.workspace = true
+version-resolver.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

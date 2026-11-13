@@ -1,0 +1,36 @@
+[package]
+name = "mats-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "MATS command line interface"
+
+[[bin]]
+name = "mats"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+conflict-detector.workspace = true
+diagnostics.workspace = true
+jar-inspector.workspace = true
+java-manager.workspace = true
+mats-core.workspace = true
+metadata-parser.workspace = true
+mixin-analyzer.workspace = true
+report-generator.workspace = true
+resource-manager.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+storage.workspace = true
+test-runner.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+updater.workspace = true
+version-resolver.workspace = true

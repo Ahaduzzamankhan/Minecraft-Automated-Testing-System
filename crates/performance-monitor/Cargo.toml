@@ -1,0 +1,18 @@
+[package]
+name = "performance-monitor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "GC log analysis and performance summaries for MATS"
+
+[dependencies]
+anyhow.workspace = true
+mats-core.workspace = true
+regex.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

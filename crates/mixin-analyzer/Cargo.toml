@@ -1,0 +1,20 @@
+[package]
+name = "mixin-analyzer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Mixin configuration and runtime analysis for MATS"
+
+[dependencies]
+anyhow.workspace = true
+jar-inspector.workspace = true
+mats-core.workspace = true
+metadata-parser.workspace = true
+regex.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

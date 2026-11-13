@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+/mats-cache
+/mats-home
+/.mats-home
+/reports
+/.mats
+*.log
+.DS_Store
+
+# Local test scratch space
+/tests/tmp
+/fixtures/generated
+
+# Downloaded third-party mod jars used for local smoke tests
+/fixtures/**/*.jar

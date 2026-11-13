@@ -1,0 +1,18 @@
+[package]
+name = "log-analyzer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Runtime log classification for MATS"
+
+[dependencies]
+anyhow.workspace = true
+mats-core.workspace = true
+regex.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "conflict-detector"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Conservative multi-mod conflict detection for MATS"
+
+[dependencies]
+anyhow.workspace = true
+jar-inspector.workspace = true
+mats-core.workspace = true
+metadata-parser.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
