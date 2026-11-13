@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  lint:
+    name: Format and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked
+
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace --locked
+      - name: Run the test suite
+        run: cargo test --workspace --locked --no-fail-fast
+      - name: Smoke test the CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/debug/mats --version
+          ./target/debug/mats --help
+          ./target/debug/mats inspect --help
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}
+          path: |
+            target/debug/deps/*.log
+            **/hs_err_pid*.log
+          if-no-files-found: ignore
+
+  release-build:
+    name: Release build (Linux)
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the release binary
+        run: cargo build --release --locked
+      - name: Check the release binary
+        run: ./target/release/mats --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mats-linux-x86_64-debug-release
+          path: target/release/mats
+          if-no-files-found: error
